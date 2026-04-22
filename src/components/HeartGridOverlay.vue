@@ -75,7 +75,7 @@ onUnmounted(() => {
         aria-label="心形照片墙"
         @click.self="close"
       >
-        <button type="button" class="heart-grid__close" title="关闭 (Esc)" @click="close">
+        <button type="button" class="heart-grid__close" title="关闭（点按或按 Esc）" @click="close">
           ✕
         </button>
         <p class="heart-grid__tip">点击每一块可放大 · Esc 关闭</p>

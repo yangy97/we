@@ -16,7 +16,7 @@ const musicOn = ref(true)
 const bgmSrc = `${base}music/love.mp3`
 /** 小爱心（SVG）惊喜，快捷键 H */
 const heartSurpriseOpen = ref(false)
-/** 全屏心形照片墙，快捷键 Esc（原版效果） */
+/** 全屏心形照片墙；桌面 Esc、移动端点右下角「墙」或下方按钮 */
 const heartGridOpen = ref(false)
 const loveStoryRef = ref(null)
 /** 与首页故事同步，供右下角像素爱心高亮 */
@@ -193,8 +193,23 @@ function onPixelSelectPage({ pageIndex }) {
     <div
       v-show="activeTab === 'home'"
       class="app__fab"
-      aria-label="音乐与像素爱心"
+      aria-label="心形墙与音乐"
     >
+      <div class="app__grid-wrap">
+        <p class="app__grid-hint" aria-hidden="true">点击有惊喜</p>
+        <button
+          type="button"
+          class="app__grid-fab"
+          :class="{ 'app__grid-fab--open': heartGridOpen }"
+          :title="heartGridOpen ? '点按关贴心形墙（电脑可按 Esc）' : '心形照片墙，点击有惊喜（电脑可按 Esc）'"
+          :aria-label="heartGridOpen ? '关贴心形照片墙' : '打开心形照片墙，点击有惊喜'"
+          :aria-pressed="heartGridOpen"
+          @click="toggleHeartGrid"
+        >
+          <span class="app__grid-fab__icon" aria-hidden="true">♡</span>
+          <span class="app__grid-fab__text">照片墙</span>
+        </button>
+      </div>
       <PixelHeartWidget
         :music-on="musicOn"
         :story-page-index="storyPageIndex"
@@ -248,7 +263,113 @@ function onPixelSelectPage({ pageIndex }) {
   display: flex;
   flex-direction: row;
   align-items: flex-end;
+  gap: 10px;
   pointer-events: auto;
+}
+
+/* 心形照片墙入口：仅移动端显示；桌面用 Esc */
+.app__grid-wrap {
+  display: none;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+  margin: 0 0 1px;
+}
+
+@media (max-width: 768px) {
+  .app__grid-wrap {
+    display: flex;
+  }
+}
+
+.app__grid-hint {
+  margin: 0;
+  padding: 0 2px;
+  max-width: 7em;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.2;
+  letter-spacing: 0.06em;
+  text-align: right;
+  color: rgba(255, 240, 248, 0.92);
+  text-shadow:
+    0 0 8px rgba(255, 100, 150, 0.55),
+    0 1px 2px rgba(0, 0, 0, 0.45);
+  white-space: nowrap;
+}
+
+.app__grid-fab {
+  flex-shrink: 0;
+  min-width: 44px;
+  min-height: 40px;
+  margin: 0;
+  padding: 8px 12px 8px 10px;
+  border: 1px solid rgba(255, 200, 220, 0.42);
+  border-radius: 999px;
+  background:
+    linear-gradient(145deg, rgba(196, 85, 140, 0.35) 0%, rgba(60, 18, 40, 0.75) 45%, rgba(25, 8, 18, 0.88) 100%);
+  color: #ffe8f0;
+  font-size: 0;
+  cursor: pointer;
+  display: inline-flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.1) inset,
+    0 6px 20px rgba(0, 0, 0, 0.35),
+    0 0 24px rgba(255, 100, 150, 0.18);
+  transition:
+    transform 0.15s ease,
+    border-color 0.2s ease,
+    box-shadow 0.2s ease,
+    filter 0.2s ease;
+}
+
+.app__grid-fab__icon {
+  font-size: 16px;
+  line-height: 1;
+  color: #ffb3d0;
+  text-shadow: 0 0 10px rgba(255, 120, 170, 0.9);
+}
+
+.app__grid-fab__text {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  line-height: 1;
+  padding-bottom: 1px;
+}
+
+.app__grid-fab--open {
+  border-color: rgba(255, 230, 240, 0.65);
+  background:
+    linear-gradient(145deg, rgba(255, 140, 180, 0.45) 0%, rgba(90, 30, 60, 0.82) 100%);
+  color: #fff;
+  box-shadow:
+    0 0 0 1px rgba(255, 200, 220, 0.35) inset,
+    0 8px 28px rgba(255, 60, 120, 0.4);
+  filter: brightness(1.05);
+}
+
+.app__grid-fab--open .app__grid-fab__icon {
+  color: #fff5f8;
+}
+
+.app__grid-fab:active {
+  transform: scale(0.96);
+}
+
+.app__grid-fab:focus {
+  outline: none;
+}
+
+.app__grid-fab:focus-visible {
+  outline: 2px solid rgba(255, 200, 220, 0.9);
+  outline-offset: 2px;
 }
 
 /* 与右下音乐区同一基线，贴在安全区内侧 */
@@ -350,6 +471,19 @@ function onPixelSelectPage({ pageIndex }) {
   .app__fab {
     right: max(8px, var(--safe-right));
     bottom: calc(86px + var(--safe-bottom));
+  }
+
+  .app__grid-hint {
+    font-size: 10px;
+    max-width: none;
+  }
+
+  .app__grid-fab {
+    padding: 7px 10px 7px 8px;
+  }
+
+  .app__grid-fab__text {
+    font-size: 12px;
   }
 }
 </style>
