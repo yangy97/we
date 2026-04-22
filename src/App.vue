@@ -178,7 +178,7 @@ function onPixelSelectPage({ pageIndex }) {
       preload="auto"
     />
 
-    <!-- 左上角：圆形跳动爱心（原版）；右下角：♪ + 像素爱心 -->
+    <!-- 左下：小爱心惊喜（无衬底，仅图标）；右下：♪ + 像素爱心 -->
     <button
       v-show="activeTab === 'home'"
       type="button"
@@ -251,56 +251,105 @@ function onPixelSelectPage({ pageIndex }) {
   pointer-events: auto;
 }
 
+/* 与右下音乐区同一基线，贴在安全区内侧 */
 .app__heart {
   position: fixed;
-  left: max(14px, env(safe-area-inset-left));
-  top: max(14px, env(safe-area-inset-top));
+  left: max(10px, env(safe-area-inset-left), var(--safe-left));
+  bottom: calc(88px + var(--safe-bottom));
+  right: auto;
+  top: auto;
   z-index: 300;
-  width: 44px;
-  height: 44px;
+  width: 48px;
+  height: 48px;
+  margin: 0;
+  border: none;
+  background: transparent;
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
   border-radius: 50%;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 107, 157, 0.55);
-  background: linear-gradient(145deg, rgba(255, 80, 140, 0.45), rgba(20, 10, 16, 0.88));
-  color: var(--text);
-  box-shadow:
-    0 0 0 1px rgba(255, 180, 210, 0.2) inset,
-    0 4px 18px rgba(255, 60, 120, 0.25);
-  transition:
-    transform 0.2s ease,
-    border-color 0.2s ease,
-    box-shadow 0.2s ease;
+  padding: 0;
+  color: inherit;
+  transition: transform 0.18s ease, opacity 0.2s ease;
+}
+
+.app__heart:focus {
+  outline: none;
+}
+
+.app__heart:focus-visible {
+  outline: 2px solid rgba(255, 160, 195, 0.75);
+  outline-offset: 4px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app__heart-icon {
+    animation: none;
+  }
 }
 
 .app__heart-icon {
-  font-size: 20px;
+  display: block;
+  font-size: 30px;
   line-height: 1;
-  color: #ffb3d0;
-  text-shadow: 0 0 12px rgba(255, 100, 160, 0.85);
-  animation: heart-wobble 2.4s ease-in-out infinite;
+  color: #ff7eb8;
+  text-shadow:
+    0 0 14px rgba(255, 100, 160, 1),
+    0 0 32px rgba(255, 60, 120, 0.65);
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.25));
+  transform-origin: center 60%;
+  animation: app-heart-beat 1.15s cubic-bezier(0.45, 0, 0.2, 1) infinite;
 }
 
-@keyframes heart-wobble {
+@keyframes app-heart-beat {
   0%,
   100% {
-    transform: scale(1);
+    transform: scale(1) translateY(0);
   }
-  50% {
-    transform: scale(1.08);
+  9% {
+    transform: scale(1.48) translateY(-3px);
+  }
+  18% {
+    transform: scale(1) translateY(0);
+  }
+  27% {
+    transform: scale(1.32) translateY(-2px);
+  }
+  38% {
+    transform: scale(1) translateY(0);
   }
 }
 
-.app__heart:hover {
-  border-color: rgba(255, 180, 210, 0.75);
+.app__heart:hover .app__heart-icon {
+  color: #ffb3d5;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.25)) brightness(1.08);
 }
 
 .app__heart:active {
-  transform: scale(0.95);
+  transform: scale(0.9);
+  opacity: 0.92;
+}
+
+@media (max-width: 480px) {
+  .app__heart {
+    left: max(8px, var(--safe-left));
+    bottom: calc(86px + var(--safe-bottom));
+    width: 46px;
+    height: 46px;
+  }
+
+  .app__heart-icon {
+    font-size: 28px;
+  }
+
+  .app__fab {
+    right: max(8px, var(--safe-right));
+    bottom: calc(86px + var(--safe-bottom));
+  }
 }
 </style>

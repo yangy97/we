@@ -180,4 +180,19 @@ function onCell(cell) {
   z-index: 2;
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.35);
 }
+
+@media (max-width: 400px) {
+  .pixel-widget {
+    --px-w: 9px;
+    --px-h: 7px;
+  }
+
+  .pixel-widget__note {
+    min-width: var(--touch-min, 44px);
+    min-height: var(--touch-min, 44px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+}
 </style>

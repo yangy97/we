@@ -267,6 +267,54 @@ onUnmounted(() => {
 .feed-fade-leave-to {
   opacity: 0;
 }
+
+@media (max-width: 480px) {
+  .feed {
+    padding: 12px 0 calc(128px + var(--safe-bottom));
+  }
+
+  .feed__header {
+    margin-bottom: 16px;
+    padding: 0 12px;
+  }
+
+  .feed__title {
+    font-size: clamp(1.2rem, 5vw, 1.45rem);
+  }
+
+  .feed__desc {
+    font-size: 13px;
+  }
+
+  .feed__stage {
+    padding: 12px 0 40px;
+  }
+
+  .feed__slide {
+    width: 80%;
+    max-width: 280px;
+  }
+
+  .feed__card:active {
+    transform: scale(0.99) translateZ(0);
+  }
+
+  .feed__lb {
+    padding: max(12px, env(safe-area-inset-top, 0px)) max(12px, env(safe-area-inset-right, 0px))
+      max(12px, env(safe-area-inset-bottom, 0px)) max(12px, env(safe-area-inset-left, 0px));
+  }
+
+  .feed__lb-close {
+    top: max(10px, env(safe-area-inset-top, 0px));
+    right: max(10px, env(safe-area-inset-right, 0px));
+    min-width: var(--touch-min, 44px);
+    min-height: var(--touch-min, 44px);
+    padding: 0 12px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+}
 </style>
 
 <style>
@@ -285,5 +333,19 @@ onUnmounted(() => {
 .feed .swiper-button-next::after,
 .feed .swiper-button-prev::after {
   font-size: 1.25rem;
+}
+
+@media (max-width: 480px) {
+  .feed .swiper-button-next,
+  .feed .swiper-button-prev {
+    width: 40px;
+    height: 40px;
+    margin-top: 0;
+  }
+
+  .feed .swiper-button-next::after,
+  .feed .swiper-button-prev::after {
+    font-size: 1rem;
+  }
 }
 </style>

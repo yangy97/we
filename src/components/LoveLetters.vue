@@ -1,26 +1,195 @@
 <script setup>
-import { ref } from 'vue'
+import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
 import { Swiper, SwiperSlide } from 'swiper/vue'
-import { Autoplay, EffectFade, Pagination } from 'swiper/modules'
+import { Autoplay, EffectCoverflow, Pagination } from 'swiper/modules'
 import { defaultLetters } from '../data/letters'
 import { ambientLoveLines } from '../data/lettersAmbient'
+import { fetchRandomLoveQuotes, isRemoteLoveQuotesEnabled } from '../api/loveQuotes'
 import 'swiper/css'
-import 'swiper/css/effect-fade'
+import 'swiper/css/effect-coverflow'
 import 'swiper/css/pagination'
 
-const modules = [Autoplay, EffectFade, Pagination]
+const modules = [Autoplay, EffectCoverflow, Pagination]
 
-/** 页面载入即有的飘动情话：随机纵向位置与快慢错相，只生成一次避免重绘抖动 */
-function buildAmbientRows() {
-  return ambientLoveLines.map((text, i) => ({
+const COVERFLOW_DESKTOP = {
+  rotate: 7,
+  stretch: 0,
+  depth: 150,
+  modifier: 1.12,
+  slideShadows: true,
+  scale: 0.88,
+}
+
+const COVERFLOW_NARROW = {
+  rotate: 4,
+  stretch: 0,
+  depth: 95,
+  modifier: 1.06,
+  slideShadows: true,
+  scale: 0.9,
+}
+
+const mqlNarrow = ref(
+  typeof window !== 'undefined' && window.matchMedia('(max-width: 480px)').matches,
+)
+let mqlNarrowList = null
+let mqlNarrowHandler = null
+
+const coverflowOptions = computed(() => (mqlNarrow.value ? COVERFLOW_NARROW : COVERFLOW_DESKTOP))
+const swiperSpaceBetween = computed(() => (mqlNarrow.value ? 6 : 12))
+
+/** 勿用 pauseOnMouseEnter，否则鼠标停在页面上方时易误以为不会自动切 */
+const autoplayOptions = {
+  delay: 4500,
+  disableOnInteraction: false,
+  pauseOnMouseEnter: false,
+  waitForTransition: true,
+}
+
+/** 整批重抽：轮播条数、飘字与网络，约每 N 秒换一批（无网时也会重抽本地/打乱飘字，看得出在换） */
+const CAROUSEL_ROTATE_SEC = 32
+const TARGET_EXTRA_SLIDES = 8
+let rotateTimer = 0
+
+/** 轮播：固定 3 封手写信 + 若干条「给宝儿」（网络 + 不足则用本地短句补满） */
+const letterSlides = ref(defaultLetters.map((x) => ({ title: x.title, body: x.body })))
+const quotesLoading = ref(false)
+const quotesHint = ref('')
+/** 首批文案就绪后再挂 Swiper，避免先 3 条再闪成 11 条、破坏自动播放 */
+const showSwiper = ref(false)
+const introEnterOnce = ref(false)
+/** Swiper 在整批 data 变化时重挂，保持内部状态与数据一致 */
+const carouselKey = ref(0)
+
+const isFirstLoad = ref(true)
+let refreshLock = false
+
+function shuffleInPlace(array) {
+  const a = array
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = (Math.random() * (i + 1)) | 0
+    ;[a[i], a[j]] = [a[j], a[i]]
+  }
+  return a
+}
+
+/**
+ * 用手写信 + 网络句 + 本地短句凑满多页；网络空时仍从 ambient 里随机抽一屏，并打乱顺序
+ */
+function fillLetterSlidesFromBatch(apiLines) {
+  const base = defaultLetters.map((x) => ({ title: x.title, body: x.body }))
+  const seen = new Set(base.map((b) => b.body.trim()))
+  const extras = []
+  for (const line of apiLines) {
+    const t = String(line || '').trim()
+    if (t.length < 2 || seen.has(t)) continue
+    seen.add(t)
+    extras.push({ title: '给宝儿', body: t })
+  }
+  const pool = ambientLoveLines.filter((l) => !seen.has(l))
+  shuffleInPlace(pool)
+  for (const t of pool) {
+    if (extras.length >= TARGET_EXTRA_SLIDES) break
+    seen.add(t)
+    extras.push({ title: '给宝儿', body: t })
+  }
+  shuffleInPlace(extras)
+  letterSlides.value = [...base, ...extras]
+}
+
+function updateAmbientRows(apiLines) {
+  if (apiLines && apiLines.length) {
+    const merged = [...apiLines, ...ambientLoveLines].slice(0, 22)
+    ambientRows.value = buildAmbientRows(merged)
+    return
+  }
+  ambientRows.value = buildAmbientRows(shuffleInPlace([...ambientLoveLines]))
+}
+
+/** 页面飘字：随机纵向位置与快慢错相；整批重抽时重算一遍 */
+function buildAmbientRows(textLines) {
+  const lines = textLines.length ? textLines : ambientLoveLines
+  return lines.map((text, i) => ({
     id: `ambient-${i}-${Math.random().toString(36).slice(2, 10)}`,
     text,
-    top: `${6 + Math.random() * 78}%`,
+    top: `${6 + Math.random() * 58}%`,
     animationDuration: `${17 + Math.random() * 16}s`,
     animationDelay: `${-Math.random() * 22}s`,
   }))
 }
-const ambientRows = ref(buildAmbientRows())
+const ambientRows = ref(buildAmbientRows(ambientLoveLines))
+
+async function refreshCarousel() {
+  if (refreshLock) return
+  refreshLock = true
+  const remote = isRemoteLoveQuotesEnabled()
+  if (isFirstLoad.value && remote) {
+    quotesLoading.value = true
+  }
+  try {
+    if (!remote) {
+      if (isFirstLoad.value) {
+        quotesHint.value = '已关闭网络情话，仅显示本地。可在 .env 设置 VITE_ENABLE_REMOTE_LOVE_QUOTES=true'
+      }
+      fillLetterSlidesFromBatch([])
+      updateAmbientRows([])
+    } else {
+      const batch = await fetchRandomLoveQuotes(8)
+      if (!batch.length) {
+        if (isFirstLoad.value) {
+          quotesHint.value = `网络句子暂拉不到，已用本地短句补满；约每 ${CAROUSEL_ROTATE_SEC} 秒会重试并随机换一批`
+        }
+      } else {
+        quotesHint.value = ''
+      }
+      fillLetterSlidesFromBatch(batch)
+      updateAmbientRows(batch)
+    }
+  } finally {
+    quotesLoading.value = false
+    isFirstLoad.value = false
+    refreshLock = false
+    showSwiper.value = true
+    nextTick(() => {
+      if (!introEnterOnce.value) introEnterOnce.value = true
+    })
+    carouselKey.value += 1
+  }
+}
+
+/** 首屏/重挂后确保自动播放已启动（部分环境下需手动 start） */
+function onSwiperInit(swiper) {
+  queueMicrotask(() => {
+    try {
+      swiper?.autoplay?.start?.()
+    } catch {
+      /* ignore */
+    }
+  })
+}
+
+onMounted(() => {
+  mqlNarrowList = window.matchMedia('(max-width: 480px)')
+  mqlNarrowHandler = () => {
+    mqlNarrow.value = mqlNarrowList.matches
+  }
+  mqlNarrowHandler()
+  mqlNarrowList.addEventListener('change', mqlNarrowHandler)
+
+  refreshCarousel()
+  rotateTimer = window.setInterval(() => {
+    refreshCarousel()
+  }, CAROUSEL_ROTATE_SEC * 1000)
+})
+
+onUnmounted(() => {
+  if (rotateTimer) window.clearInterval(rotateTimer)
+  if (mqlNarrowList && mqlNarrowHandler) {
+    mqlNarrowList.removeEventListener('change', mqlNarrowHandler)
+  }
+  mqlNarrowList = null
+  mqlNarrowHandler = null
+})
 
 const LS_KEY = 'love-vue-danmaku-v1'
 
@@ -92,29 +261,41 @@ function sendDanmaku() {
 
     <header class="letters__header">
       <h1 class="letters__title">我爱你宝</h1>
+      <p v-if="quotesLoading" class="letters__hint">正在拉取网络随机情话…</p>
+      <p v-else-if="quotesHint" class="letters__hint">{{ quotesHint }}</p>
     </header>
 
-    <div class="letters__swiper-wrap">
+    <div
+      class="letters__swiper-wrap"
+      :class="{ 'letters__swiper-wrap--enter': introEnterOnce }"
+    >
+      <div
+        v-if="!showSwiper"
+        class="letters__swiper-skeleton"
+        aria-hidden="true"
+      />
       <Swiper
+        v-else
+        :key="carouselKey"
         class="letters__swiper"
         :modules="modules"
-        effect="fade"
-        :fade-effect="{ crossFade: true }"
-        :loop="true"
-        :speed="900"
-        :autoplay="{
-          delay: 5200,
-          disableOnInteraction: false,
-          pauseOnMouseEnter: true,
-        }"
-        :pagination="{ clickable: true, dynamicBullets: true }"
+        :slides-per-view="1"
+        :centered-slides="true"
+        :space-between="swiperSpaceBetween"
+        :speed="800"
+        effect="coverflow"
+        :coverflow-effect="coverflowOptions"
+        :rewind="true"
         :grab-cursor="true"
+        :autoplay="autoplayOptions"
+        :pagination="{ clickable: true, dynamicBullets: true }"
+        @swiper="onSwiperInit"
       >
-        <SwiperSlide v-for="(item, i) in defaultLetters" :key="i" class="letters__slide">
+        <SwiperSlide v-for="(item, i) in letterSlides" :key="`${i}-${item.body?.slice(0, 12)}`" class="letters__slide">
           <article class="letters__card">
             <div class="letters__card-glow" aria-hidden="true" />
             <div class="letters__card-edge" aria-hidden="true" />
-            <h2 class="letters__card-title">{{ item.title }}</h2>
+            <h2 class="letters__card-title">{{ item.title || '给宝儿' }}</h2>
             <p class="letters__card-body">{{ item.body }}</p>
           </article>
         </SwiperSlide>
@@ -138,18 +319,23 @@ function sendDanmaku() {
 
 <style scoped>
 .letters {
+  /* 与底栏(约 88px) + 输入条(bottom:130 + 条高约 50px) 对齐，信卡/飘字不伸入被遮挡区 */
+  --letters-bottom-pad: calc(200px + var(--safe-bottom));
   position: relative;
   isolation: isolate;
   min-height: 100vh;
   min-height: 100dvh;
-  padding: 20px 0 calc(120px + var(--safe-bottom));
+  padding: 20px 0 var(--letters-bottom-pad);
   overflow: hidden;
 }
 
 /* 默认情话：铺在底层层，不挡住信卡正文 */
 .letters__ambient {
   position: fixed;
-  inset: 0;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: var(--letters-bottom-pad);
   overflow: hidden;
   pointer-events: none;
   z-index: 0;
@@ -177,7 +363,10 @@ function sendDanmaku() {
 
 .letters__danmaku {
   position: fixed;
-  inset: 0;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: var(--letters-bottom-pad);
   overflow: hidden;
   pointer-events: none;
   z-index: 260;
@@ -213,7 +402,7 @@ function sendDanmaku() {
 
 .letters__header {
   position: relative;
-  z-index: 2;
+  z-index: 4;
   max-width: 520px;
   margin: 0 auto 16px;
   padding: 0 16px;
@@ -226,6 +415,14 @@ function sendDanmaku() {
   font-weight: 800;
 }
 
+.letters__hint {
+  margin: 0 0 10px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--muted);
+  opacity: 0.92;
+}
+
 .letters__desc {
   margin: 0;
   font-size: 13px;
@@ -235,11 +432,52 @@ function sendDanmaku() {
 
 .letters__swiper-wrap {
   position: relative;
-  z-index: 2;
+  z-index: 4;
   max-width: 560px;
   margin: 0 auto;
   padding: 0 12px 8px;
   filter: drop-shadow(0 20px 50px rgba(196, 113, 245, 0.12));
+}
+
+.letters__swiper-wrap--enter {
+  animation: letters-swiper-entrance 0.9s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes letters-swiper-entrance {
+  from {
+    opacity: 0;
+    transform: translateY(24px) scale(0.98);
+    filter: blur(5px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+    filter: none;
+  }
+}
+
+.letters__swiper-skeleton {
+  min-height: 288px;
+  border-radius: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: linear-gradient(
+    110deg,
+    rgba(255, 255, 255, 0.04) 0%,
+    rgba(255, 255, 255, 0.1) 48%,
+    rgba(255, 255, 255, 0.04) 100%
+  );
+  background-size: 220% 100%;
+  animation: letters-skeleton-sweep 1.1s ease-in-out infinite;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.28);
+}
+
+@keyframes letters-skeleton-sweep {
+  0% {
+    background-position: 0% 0;
+  }
+  100% {
+    background-position: 100% 0;
+  }
 }
 
 .letters__swiper {
@@ -255,12 +493,15 @@ function sendDanmaku() {
 
 .letters__card {
   position: relative;
+  z-index: 1;
+  isolation: isolate;
   width: 100%;
   padding: 22px 22px 24px;
   border-radius: 20px;
   background:
-    linear-gradient(160deg, rgba(255, 255, 255, 0.14) 0%, rgba(255, 255, 255, 0.04) 45%, rgba(196, 113, 245, 0.06) 100%);
-  border: 1px solid rgba(255, 255, 255, 0.14);
+    linear-gradient(160deg, rgba(20, 10, 20, 0.72) 0%, rgba(12, 6, 14, 0.78) 50%, rgba(30, 16, 32, 0.65) 100%),
+    linear-gradient(160deg, rgba(255, 255, 255, 0.12) 0%, rgba(255, 255, 255, 0.04) 45%, rgba(196, 113, 245, 0.06) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.15);
   box-shadow:
     0 16px 48px rgba(0, 0, 0, 0.35),
     0 0 0 1px rgba(255, 107, 157, 0.08) inset,
@@ -268,7 +509,7 @@ function sendDanmaku() {
   overflow: hidden;
   min-height: 220px;
   box-sizing: border-box;
-  backdrop-filter: blur(14px);
+  backdrop-filter: blur(16px);
   transition:
     box-shadow 0.45s ease,
     transform 0.45s ease;
@@ -439,6 +680,64 @@ function sendDanmaku() {
 
 .letters__send:active {
   transform: scale(0.97);
+}
+
+@media (max-width: 520px) {
+  .letters {
+    padding: 14px 0 var(--letters-bottom-pad);
+  }
+
+  .letters__header {
+    padding: 0 max(12px, var(--safe-left)) 0 max(12px, var(--safe-right));
+  }
+
+  .letters__title {
+    font-size: clamp(1.2rem, 5.2vw, 1.45rem);
+  }
+
+  .letters__swiper-wrap {
+    padding: 0 8px 8px;
+  }
+
+  .letters__card {
+    padding: 16px 16px 18px;
+    min-height: 200px;
+    border-radius: 16px;
+  }
+
+  .letters__card-title {
+    font-size: 1.05rem;
+  }
+
+  .letters__card-body {
+    font-size: 16px;
+    line-height: 1.72;
+  }
+
+  .letters__composer {
+    left: max(10px, var(--safe-left));
+    right: max(10px, var(--safe-right));
+    max-width: none;
+    gap: 8px;
+  }
+
+  /* iOS：输入框字号 <16px 时聚焦会强制缩放整页 */
+  .letters__input {
+    font-size: 16px;
+    line-height: 1.4;
+  }
+
+  .letters__send {
+    min-width: 52px;
+    min-height: var(--touch-min, 44px);
+    padding: 0 14px;
+    font-size: 15px;
+  }
+
+  .letters__ambient-line {
+    font-size: 13px;
+    max-width: 88vw;
+  }
 }
 </style>
 

@@ -143,4 +143,32 @@ function select(id) {
 .tab-nav__btn:active {
   transform: scale(0.97);
 }
+
+@media (max-width: 420px) {
+  .tab-nav {
+    padding: 16px 10px calc(12px + var(--safe-bottom));
+  }
+
+  .tab-nav__inner {
+    gap: 4px;
+    padding: 5px 5px 5px 5px;
+    max-width: 100%;
+  }
+
+  .tab-nav__btn {
+    min-height: var(--touch-min, 44px);
+    padding: 10px 4px;
+    font-size: 12px;
+  }
+}
+
+@media (max-width: 360px) {
+  .tab-nav__label {
+    letter-spacing: 0;
+  }
+
+  .tab-nav__btn {
+    font-size: 11.5px;
+  }
+}
 </style>

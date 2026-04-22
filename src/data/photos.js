@@ -2,7 +2,7 @@ function asset(path) {
   return `${import.meta.env.BASE_URL}${path.replace(/^\//, '')}`
 }
 
-/** 动态页照片（与 lovewjl/img 中文件对应） */
+/** 动态页照片（与 public/img 中文件对应，可由 sync-assets 从旧站同步） */
 export const galleryPhotos = [
   asset('img/iali0.jpg'),
   asset('img/iali2.jpg'),

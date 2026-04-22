@@ -9,8 +9,8 @@
   },
   "scripts": {
     "sync:assets": "node scripts/sync-assets.mjs",
-    "dev": "npm run sync:assets && vite",
-    "build": "npm run sync:assets && vite build",
+    "dev": "vite",
+    "build": "vite build",
     "preview": "vite preview"
   },
   "dependencies": {

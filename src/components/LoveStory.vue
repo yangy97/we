@@ -2,7 +2,6 @@
 import { ref, computed, watch, onMounted, onUnmounted, inject } from 'vue'
 import rawStory from '../assets/story-flow-body.html?raw'
 import { parseStoryPages } from '../utils/parseStoryHtml'
-import '../../../lovewjl/css/all.min.css'
 
 const props = defineProps({
   active: { type: Boolean, default: false },
@@ -149,6 +148,11 @@ onUnmounted(() => {
   </div>
 </template>
 
+<style>
+/* 旧站 all.min 已放在 public/css，开发/预览用 /css/... 由 Vite 直出 */
+@import url('/css/all.min.css');
+</style>
+
 <style scoped>
 .love-story {
   min-height: 100vh;
@@ -290,5 +294,44 @@ onUnmounted(() => {
   font-size: 11px;
   color: rgba(255, 255, 255, 0.45);
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+  line-height: 1.45;
+  word-break: break-word;
+}
+
+@media (max-width: 480px) {
+  .love-story {
+    padding-bottom: calc(128px + var(--safe-bottom, 0px));
+  }
+
+  .love-story__flow,
+  .love-story__section,
+  .love-story__page {
+    min-height: calc(100dvh - 88px);
+  }
+
+  .love-story__page-inner {
+    padding: 0 6px 8px;
+    gap: 10px;
+  }
+
+  .love-story__page-inner :deep(img) {
+    max-height: min(36vh, 320px);
+  }
+
+  .love-story__page.full-img .love-story__page-inner :deep(img) {
+    max-height: min(46vh, 420px);
+  }
+
+  .love-story__bar {
+    padding: 0 max(10px, env(safe-area-inset-left)) 0 max(10px, env(safe-area-inset-right));
+  }
+
+  .love-story__track {
+    margin-bottom: 8px;
+  }
+
+  .love-story__hint {
+    font-size: 10px;
+  }
 }
 </style>
